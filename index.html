@@ -67,6 +67,17 @@
   .chip .dot{width:9px;height:9px;border-radius:50%}
   .chip.on{border-color:transparent;color:#fff}
   .chip.manage{border-style:dashed;border-color:var(--b3);color:var(--b5)}
+  /* Contenedor colapsable de áreas */
+  .area-collapse{width:100%}
+  .area-summary{display:none} /* oculto en escritorio */
+  .area-chips{display:flex;gap:8px;flex-wrap:wrap;align-items:center} /* siempre visible en escritorio */
+  @media(max-width:720px){
+    .area-summary{display:flex;align-items:center;gap:8px;list-style:none;cursor:pointer;font-size:13px;font-weight:700;color:var(--b5);background:var(--card);border:1.5px solid var(--line);border-radius:10px;padding:9px 13px;user-select:none}
+    .area-summary::-webkit-details-marker{display:none}
+    .area-summary .chev{margin-left:auto;transition:transform .2s}
+    .area-collapse[open] .area-summary .chev{transform:rotate(180deg)}
+    .area-chips{padding-top:10px}
+  }
 
   .body{display:grid;grid-template-columns:1fr;transition:.2s}
   .body.with-notes{grid-template-columns:1fr 320px}
@@ -556,9 +567,24 @@ function renderWorkload(visible){
 /* ============ Filtros de área ============ */
 function renderFilters(){
   const host=document.getElementById('areaFilter');
-  host.innerHTML=areas.map(a=>{const on=!hiddenAreas.has(a.id);return `<span class="chip ${on?'on':''}" data-area="${a.id}" style="${on?`background:${a.color};`:''}"><span class="dot" style="background:${on?'#fff':a.color}"></span>${escapeHtml(a.name)}</span>`;}).join('')+`<span class="chip manage" id="manageAreasChip">⚙ Áreas</span>`;
-  host.querySelectorAll('.chip[data-area]').forEach(c=>c.addEventListener('click',()=>{const id=c.dataset.area;hiddenAreas.has(id)?hiddenAreas.delete(id):hiddenAreas.add(id);renderFilters();render();}));
-  document.getElementById('manageAreasChip').addEventListener('click',openAreaModal);
+  const chips=areas.map(a=>{const on=!hiddenAreas.has(a.id);return `<span class="chip ${on?'on':''}" data-area="${a.id}" style="${on?`background:${a.color};`:''}"><span class="dot" style="background:${on?'#fff':a.color}"></span>${escapeHtml(a.name)}</span>`;}).join('')+`<span class="chip manage" id="manageAreasChip">⚙ Áreas</span>`;
+  const shown=areas.filter(a=>!hiddenAreas.has(a.id)).length;
+  const hidden=areas.length-shown;
+  const summary=hidden>0?`Áreas · ${shown} visibles, ${hidden} ocultas`:`Áreas · todas (${areas.length})`;
+  // <details> colapsable en móvil (CSS lo mantiene abierto en escritorio)
+  host.innerHTML=`<details class="area-collapse" id="areaCollapse">
+      <summary class="area-summary">🗂 ${summary} <span class="chev">▾</span></summary>
+      <div class="area-chips">${chips}</div>
+    </details>`;
+  host.querySelectorAll('.chip[data-area]').forEach(c=>c.addEventListener('click',ev=>{ev.preventDefault();const id=c.dataset.area;hiddenAreas.has(id)?hiddenAreas.delete(id):hiddenAreas.add(id);renderFilters();render();}));
+  document.getElementById('manageAreasChip').addEventListener('click',ev=>{ev.preventDefault();openAreaModal();});
+  syncAreaCollapse();
+}
+// En escritorio el desplegable siempre abierto; en móvil arranca cerrado.
+function syncAreaCollapse(){
+  const d=document.getElementById('areaCollapse');
+  if(!d)return;
+  if(window.innerWidth>720)d.open=true;
 }
 
 /* ============ Modal tarea ============ */
@@ -697,6 +723,7 @@ document.getElementById('areaOverlay').addEventListener('click',e=>{if(e.target.
 document.getElementById('addAreaBtn').addEventListener('click',addAreaDraft);
 document.getElementById('saveAreasBtn').addEventListener('click',saveAreasNow);
 document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();document.getElementById('areaOverlay').classList.remove('show');document.getElementById('ownerOverlay').classList.remove('show');closeNotes();}});
+window.addEventListener('resize',syncAreaCollapse);
 
 /* ============ Init ============ */
 (async function(){
